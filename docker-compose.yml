@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: fir-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: fir-backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB: fir_management
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      BLOCKCHAIN_RPC_URL: http://hardhat:8545
+      CONTRACT_ADDRESS: ${CONTRACT_ADDRESS:-}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
+      PINATA_JWT: ${PINATA_JWT:-}
+      CORS_ORIGINS: "*"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  hardhat:
+    image: node:20-alpine
+    working_dir: /contracts
+    volumes:
+      - ./contracts:/contracts
+    command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+
+volumes:
+  mongo_data:
